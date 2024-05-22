@@ -1,4 +1,4 @@
-name: Telegram Bot
+name: YTB Default
 
 on:
   push:
