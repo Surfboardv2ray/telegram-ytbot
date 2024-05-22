@@ -52,7 +52,7 @@ def handle_message(update, context):
     else:
         update.message.reply_text('Please send a valid YouTube link or playlist link.')
 
-def download_youtube_playlist(playlist_url, update, quality=None):
+def download_youtube_playlist(playlist_url, message, quality=None):
     try:
         playlist = Playlist(playlist_url)
         total_videos = len(playlist.video_urls)
@@ -60,18 +60,18 @@ def download_youtube_playlist(playlist_url, update, quality=None):
 
         for video_url in playlist.video_urls:
             current_video += 1
-            update.message.reply_text(f'Uploading video {current_video}/{total_videos}...')
+            message.reply_text(f'Uploading video {current_video}/{total_videos}...')
 
             video_file = download_youtube_video(video_url, './', quality=quality)
             fileio_link = upload_to_fileio(video_file)
             if fileio_link:
-                update.message.reply_text(f'Uploaded video {current_video}/{total_videos}: {fileio_link}')
+                message.reply_text(f'Uploaded video {current_video}/{total_videos}: {fileio_link}')
             else:
-                update.message.reply_text(f'Failed to upload video {current_video}/{total_videos}.')
+                message.reply_text(f'Failed to upload video {current_video}/{total_videos}.')
             os.remove(video_file)
 
     except Exception as e:
-        update.message.reply_text(f'Error: {e}')
+        message.reply_text(f'Error: {e}')
 
 def button(update, context):
     query = update.callback_query
