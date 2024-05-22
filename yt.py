@@ -2,7 +2,7 @@ import os
 import re
 import requests
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-from pytube import Playlist
+from pytube import YouTube, Playlist  # Add import statement for YouTube class
 
 # Get the Telegram bot token from environment variables
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
@@ -11,7 +11,7 @@ def start(update, context):
     update.message.reply_text('Send me a YouTube link or playlist link, and I will download the video(s) and send you a link.')
 
 def download_youtube_video(url, output_path):
-    yt = YouTube(url)
+    yt = YouTube(url)  # Fix: Added import for YouTube class
     stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
     stream.download(output_path=output_path)
     return stream.default_filename
