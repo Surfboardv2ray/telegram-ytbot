@@ -4,6 +4,7 @@ import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 from pytube import YouTube, Playlist
+from pytube.exceptions import RegexMatchError, VideoUnavailable, ExtractError
 
 # Get the Telegram bot token from environment variables
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
@@ -22,15 +23,18 @@ def normalize_youtube_url(url):
     return url
 
 def download_youtube_video(url, output_path, quality=None):
-    yt = YouTube(url)
-    if quality:
-        stream = yt.streams.filter(resolution=quality).first()
-        if not stream:
-            raise ValueError("Cannot find the specified resolution, please try again with a different option.")
-    else:
-        stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-    stream.download(output_path=output_path)
-    return stream.default_filename
+    try:
+        yt = YouTube(url)
+        if quality:
+            stream = yt.streams.filter(resolution=quality).first()
+            if not stream:
+                raise ValueError("Cannot find the specified resolution, please try again with a different option.")
+        else:
+            stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+        stream.download(output_path=output_path)
+        return stream.default_filename
+    except (RegexMatchError, VideoUnavailable, ExtractError) as e:
+        raise ValueError(f"Error processing video: {str(e)}")
 
 def upload_to_fileio(file_path):
     with open(file_path, 'rb') as file:
