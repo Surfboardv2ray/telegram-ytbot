@@ -118,16 +118,14 @@ def button(update, context):
         except ValueError as e:
             query.answer()
             query.edit_message_text(text=str(e))
-    elif quality == 'lowest':
+    elif quality in ['lowest', 'highest']:  # Adjusted condition to check for 'lowest' or 'highest'
         query.answer()
-        query.edit_message_text(text=f"Selected quality: Lowest Quality")
+        query.edit_message_text(text=f"Selected quality: {quality.capitalize()} Quality")
         url = context.user_data['url']
-        download_youtube_playlist(url, query.message)
-    elif quality == 'highest':
+        download_youtube_playlist(url, query.message, quality=quality)  # Pass the quality option to the function
+    else:
         query.answer()
-        query.edit_message_text(text=f"Selected quality: Highest Quality")
-        url = context.user_data['url']
-        download_youtube_playlist(url, query.message)
+        query.edit_message_text(text="Invalid option.")
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
