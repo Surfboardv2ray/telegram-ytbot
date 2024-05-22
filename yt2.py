@@ -9,11 +9,14 @@ from pytube import YouTube, Playlist
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 def start(update, context):
-    update.message.reply_text('Send me a YouTube link or playlist link, and I will download the video(s) and send you a link.')
+    update.message.reply_text('Send me a YouTube link, playlist link, or Shorts link, and I will download the video(s) and send you a link.')
 
 def normalize_youtube_url(url):
-    # Check if the URL is a shortened YouTube URL
+    # Check if the URL is a shortened YouTube URL or a Shorts URL
     if 'youtu.be' in url:
+        video_id = url.split('/')[-1]
+        return f'https://www.youtube.com/watch?v={video_id}'
+    elif 'youtube.com/shorts' in url:
         video_id = url.split('/')[-1]
         return f'https://www.youtube.com/watch?v={video_id}'
     return url
@@ -100,8 +103,14 @@ def handle_message(update, context):
                      InlineKeyboardButton("Highest Quality", callback_data='highest')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text('Please select the quality for all videos in the playlist:', reply_markup=reply_markup)
+    elif 'youtube.com/shorts' in normalized_url:  # Check if it's a Shorts link
+        yt = YouTube(normalized_url)
+        available_qualities = [stream.resolution for stream in yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc()]
+        keyboard = [[InlineKeyboardButton(q, callback_data=q) for q in available_qualities]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text('Please select the video quality:', reply_markup=reply_markup)
     else:
-        update.message.reply_text('Please send a valid YouTube link or playlist link.')
+        update.message.reply_text('Please send a valid YouTube link, playlist link, or Shorts link.')
 
 def button(update, context):
     query = update.callback_query
