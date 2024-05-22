@@ -10,7 +10,7 @@ from pytube.exceptions import RegexMatchError, VideoUnavailable, ExtractError
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 def start(update, context):
-    update.message.reply_text('Send me a YouTube link or playlist link, and I will download the video(s) and send you a link.')
+    update.message.reply_text('Send me a YouTube link, playlist link, or Shorts link, and I will download the video(s) and send you a link.')
 
 def normalize_youtube_url(url):
     # Check if the URL is a shortened YouTube URL or a Shorts URL
@@ -70,9 +70,11 @@ def download_youtube_playlist(playlist_url, message, quality=None):
         else:
             message.reply_text("Invalid quality option.")
             return
+
         playlist = Playlist(playlist_url)
         total_videos = len(playlist.video_urls)
         current_video = 0
+
         for video_url in playlist.video_urls:
             current_video += 1
             message.reply_text(f'Uploading video {current_video}/{total_videos}...')
@@ -84,14 +86,17 @@ def download_youtube_playlist(playlist_url, message, quality=None):
             else:
                 message.reply_text(f'Failed to upload video {current_video}/{total_videos} in {selected_quality}.')
             os.remove(video_file)
+
     except Exception as e:
         message.reply_text(f'Error: {e}')
 
 def handle_message(update, context):
     url = update.message.text
     chat_id = update.message.chat_id
-    context.user_data['url'] = url  # Save the URL in user's context
-    if 'youtube.com/watch' in url:  # Check if it's a regular video link
+    normalized_url = normalize_youtube_url(url)
+    context.user_data['url'] = normalized_url  # Save the normalized URL in user's context
+
+    if 'youtube.com/watch' in normalized_url:  # Check if it's a regular video link
         keyboard = [[InlineKeyboardButton("144p", callback_data='144'),
                      InlineKeyboardButton("240p", callback_data='240'),
                      InlineKeyboardButton("360p", callback_data='360'),
@@ -100,63 +105,53 @@ def handle_message(update, context):
                      InlineKeyboardButton("1080p", callback_data='1080')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text('Please select the video quality:', reply_markup=reply_markup)
-    elif 'youtube.com/playlist' in url:  # Check if it's a playlist link
+    elif 'youtube.com/playlist' in normalized_url:  # Check if it's a playlist link
         keyboard = [[InlineKeyboardButton("Lowest Quality", callback_data='lowest'),
                      InlineKeyboardButton("Highest Quality", callback_data='highest')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text('Please select the quality for all videos in the playlist:', reply_markup=reply_markup)
+    elif 'youtube.com/shorts' in normalized_url:  # Check if it's a Shorts link
+        yt = YouTube(normalized_url)
+        available_qualities = [stream.resolution for stream in yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc()]
+        keyboard = [[InlineKeyboardButton(q, callback_data=q) for q in available_qualities]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text('Please select the video quality:', reply_markup=reply_markup)
     else:
-        update.message.reply_text('Please send a valid YouTube link or playlist link.')
+        update.message.reply_text('Please send a valid YouTube link, playlist link, or Shorts link.')
 
 def button(update, context):
     query = update.callback_query
     quality = query.data
 
-    if quality.isdigit():
-        quality += 'p'  # Append 'p' to make it resolution (e.g., 720p)
+    if quality.isdigit() or quality.endswith('p'):
+        quality = quality + 'p' if quality.isdigit() else quality
         try:
             query.answer()
             query.edit_message_text(text=f"Selected video quality: {quality}")
             url = context.user_data['url']
             video_file = download_youtube_video(url, './', quality=quality)
-            
-            # Check file size
-            file_size_mb = os.path.getsize(video_file) / (1024 * 1024)  # Get size in MB
-            if file_size_mb > 2000:
-                query.message.reply_text("File size can't exceed 2 GB. Try another quality or video.")
-                os.remove(video_file)  # Remove the downloaded file
-                return
-            
-            # Display file size
-            query.message.reply_text(f"Video size: {file_size_mb:.2f} MB")
-            
-            # Upload to file.io
             fileio_link = upload_to_fileio(video_file)
             if fileio_link:
                 query.message.reply_text(f'Here is your video in {quality}: {fileio_link}')
             else:
                 query.message.reply_text('Failed to upload the video.')
-            os.remove(video_file)  # Remove the downloaded file after uploading
+            os.remove(video_file)
         except ValueError as e:
             query.answer()
             query.edit_message_text(text=str(e))
     elif quality in ['lowest', 'highest']:  # Adjusted condition to check for 'lowest' or 'highest'
         query.answer()
-        query.edit_message_text(text=f"Selected quality: Lowest Quality")
         query.edit_message_text(text=f"Selected quality: {quality.capitalize()} Quality")
         url = context.user_data['url']
-        download_youtube_playlist(url, query.message)
+        download_youtube_playlist(url, query.message, quality=quality)  # Pass the quality option to the function
     else:
         query.answer()
-        query.edit_message_text(text=f"Selected quality: Highest Quality")
-        url = context.user_data['url']
-        download_youtube_playlist(url, query.message)
         query.edit_message_text(text="Invalid option.")
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("No TELEGRAM_BOT_TOKEN found. Set the TELEGRAM_BOT_TOKEN environment variable.")
-    
+
     updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler('start', start))
