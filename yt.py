@@ -1,8 +1,8 @@
 import os
-import re  # Import regular expression module
+import re
 import requests
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-from pytube import YouTube, Playlist
+from pytube import Playlist
 
 # Get the Telegram bot token from environment variables
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
@@ -15,15 +15,6 @@ def download_youtube_video(url, output_path):
     stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
     stream.download(output_path=output_path)
     return stream.default_filename
-
-def download_youtube_playlist(playlist_url, output_path):
-    # Extract playlist ID using regular expression
-    playlist_id = re.search(r'&list=(\w+)', playlist_url).group(1)
-    playlist = Playlist(f'https://www.youtube.com/playlist?list={playlist_id}')
-    for video in playlist.videos:
-        print(f'Downloading {video.title}...')
-        video.streams.get_highest_resolution().download(output_path=output_path)
-        print(f'{video.title} downloaded successfully.')
 
 def upload_to_fileio(file_path):
     with open(file_path, 'rb') as file:
@@ -49,10 +40,31 @@ def handle_message(update, context):
         os.remove(video_file)
     elif 'youtube.com/playlist' in url:  # Check if it's a playlist link
         update.message.reply_text('Downloading playlist...')
-        download_youtube_playlist(url, './')
+        download_youtube_playlist(url, update)
         update.message.reply_text('Playlist downloaded successfully.')
     else:
         update.message.reply_text('Please send a valid YouTube link or playlist link.')
+
+def download_youtube_playlist(playlist_url, update):
+    try:
+        playlist = Playlist(playlist_url)
+        total_videos = len(playlist.video_urls)
+        current_video = 0
+
+        for video_url in playlist.video_urls:
+            current_video += 1
+            update.message.reply_text(f'Uploading video {current_video}/{total_videos}...')
+
+            video_file = download_youtube_video(video_url, './')
+            fileio_link = upload_to_fileio(video_file)
+            if fileio_link:
+                update.message.reply_text(f'Uploaded video {current_video}/{total_videos}: {fileio_link}')
+            else:
+                update.message.reply_text(f'Failed to upload video {current_video}/{total_videos}.')
+            os.remove(video_file)
+
+    except Exception as e:
+        update.message.reply_text(f'Error: {e}')
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
