@@ -34,12 +34,13 @@ def handle_message(update, context):
     context.user_data['url'] = url  # Save the URL in user's context
 
     if 'youtube.com/watch' in url:  # Check if it's a regular video link
-        keyboard = [[InlineKeyboardButton("144p", callback_data='144'),
-                     InlineKeyboardButton("240p", callback_data='240'),
-                     InlineKeyboardButton("360p", callback_data='360'),
-                     InlineKeyboardButton("480p", callback_data='480'),
-                     InlineKeyboardButton("720p", callback_data='720'),
-                     InlineKeyboardButton("1080p", callback_data='1080')]]
+        yt = YouTube(url)
+        available_qualities = yt.streams.filter(progressive=True).order_by('resolution').desc()
+        quality_buttons = []
+        for stream in available_qualities:
+            if stream.resolution:
+                quality_buttons.append(InlineKeyboardButton(stream.resolution, callback_data=stream.resolution))
+        keyboard = [quality_buttons]
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text('Please select the video quality:', reply_markup=reply_markup)
     elif 'youtube.com/playlist' in url:  # Check if it's a playlist link
