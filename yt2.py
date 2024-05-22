@@ -80,6 +80,13 @@ def download_youtube_playlist(playlist_url, message, quality=None):
             message.reply_text(f'Uploading video {current_video}/{total_videos}...')
             
             video_file = download_youtube_video(video_url, './', quality=selected_quality)
+            file_size_mb = os.path.getsize(video_file) / (1024 * 1024)  # Get file size in MB
+
+            if file_size_mb > 2000:  # Check if file size exceeds 2 GB
+                message.reply_text(f'File size is {file_size_mb:.2f} MB, which exceeds 2 GB. Try another quality or video.')
+                os.remove(video_file)
+                continue
+
             fileio_link = upload_to_fileio(video_file)
             if fileio_link:
                 message.reply_text(f'Uploaded video {current_video}/{total_videos} in {selected_quality}: {fileio_link}')
@@ -130,6 +137,14 @@ def button(update, context):
             query.edit_message_text(text=f"Selected video quality: {quality}")
             url = context.user_data['url']
             video_file = download_youtube_video(url, './', quality=quality)
+
+            file_size_mb = os.path.getsize(video_file) / (1024 * 1024)  # Get file size in MB
+            if file_size_mb > 2000:  # Check if file size exceeds 2 GB
+                query.message.reply_text(f'File size is {file_size_mb:.2f} MB, which exceeds 2 GB. Try another quality or video.')
+                os.remove(video_file)
+                return
+
+            query.message.reply_text(f'File size: {file_size_mb:.2f} MB')
             fileio_link = upload_to_fileio(video_file)
             if fileio_link:
                 query.message.reply_text(f'Here is your video in {quality}: {fileio_link}')
