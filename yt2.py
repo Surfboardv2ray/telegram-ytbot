@@ -97,9 +97,12 @@ def handle_message(update, context):
     context.user_data['url'] = normalized_url  # Save the normalized URL in user's context
 
     if 'youtube.com/watch' in normalized_url:  # Check if it's a regular video link
-        yt = YouTube(normalized_url)
-        available_qualities = [stream.resolution for stream in yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc()]
-        keyboard = [[InlineKeyboardButton(q, callback_data=q) for q in available_qualities]]
+        keyboard = [[InlineKeyboardButton("144p", callback_data='144'),
+                     InlineKeyboardButton("240p", callback_data='240'),
+                     InlineKeyboardButton("360p", callback_data='360'),
+                     InlineKeyboardButton("480p", callback_data='480'),
+                     InlineKeyboardButton("720p", callback_data='720'),
+                     InlineKeyboardButton("1080p", callback_data='1080')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text('Please select the video quality:', reply_markup=reply_markup)
     elif 'youtube.com/playlist' in normalized_url:  # Check if it's a playlist link
