@@ -39,7 +39,7 @@ def get_playlist_video_qualities(playlist_url):
         qualities.extend(video_qualities)
     return qualities
 
-def download_youtube_playlist(playlist_url, message):
+def download_youtube_playlist(playlist_url, message, quality=None):
     try:
         playlist_qualities = get_playlist_video_qualities(playlist_url)
         if not playlist_qualities:
@@ -49,8 +49,30 @@ def download_youtube_playlist(playlist_url, message):
         lowest_quality = min(playlist_qualities)
         highest_quality = max(playlist_qualities)
         
-        message.reply_text(f"Lowest quality available in the playlist: {lowest_quality}")
-        message.reply_text(f"Highest quality available in the playlist: {highest_quality}")
+        if quality == 'lowest':
+            selected_quality = lowest_quality
+        elif quality == 'highest':
+            selected_quality = highest_quality
+        else:
+            message.reply_text("Invalid quality option.")
+            return
+
+        playlist = Playlist(playlist_url)
+        total_videos = len(playlist.video_urls)
+        current_video = 0
+
+        for video_url in playlist.video_urls:
+            current_video += 1
+            message.reply_text(f'Uploading video {current_video}/{total_videos}...')
+            
+            video_file = download_youtube_video(video_url, './', quality=selected_quality)
+            fileio_link = upload_to_fileio(video_file)
+            if fileio_link:
+                message.reply_text(f'Uploaded video {current_video}/{total_videos} in {selected_quality}: {fileio_link}')
+            else:
+                message.reply_text(f'Failed to upload video {current_video}/{total_videos} in {selected_quality}.')
+            os.remove(video_file)
+
     except Exception as e:
         message.reply_text(f'Error: {e}')
 
