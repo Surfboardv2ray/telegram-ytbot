@@ -1,19 +1,29 @@
 import os
+import re  # Import regular expression module
 import requests
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-from pytube import YouTube
+from pytube import YouTube, Playlist
 
 # Get the Telegram bot token from environment variables
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 def start(update, context):
-    update.message.reply_text('Send me a YouTube link and I will download the video and send you a link.')
+    update.message.reply_text('Send me a YouTube link or playlist link, and I will download the video(s) and send you a link.')
 
 def download_youtube_video(url, output_path):
     yt = YouTube(url)
     stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
     stream.download(output_path=output_path)
     return stream.default_filename
+
+def download_youtube_playlist(playlist_url, output_path):
+    # Extract playlist ID using regular expression
+    playlist_id = re.search(r'&list=(\w+)', playlist_url).group(1)
+    playlist = Playlist(f'https://www.youtube.com/playlist?list={playlist_id}')
+    for video in playlist.videos:
+        print(f'Downloading {video.title}...')
+        video.streams.get_highest_resolution().download(output_path=output_path)
+        print(f'{video.title} downloaded successfully.')
 
 def upload_to_fileio(file_path):
     with open(file_path, 'rb') as file:
@@ -27,7 +37,7 @@ def handle_message(update, context):
     url = update.message.text
     chat_id = update.message.chat_id
 
-    if 'youtube.com' in url or 'youtu.be' in url:
+    if 'youtube.com/watch' in url:  # Check if it's a regular video link
         update.message.reply_text('Downloading video...')
         video_file = download_youtube_video(url, './')
         update.message.reply_text('Uploading to file.io...')
@@ -37,8 +47,12 @@ def handle_message(update, context):
         else:
             update.message.reply_text('Failed to upload the video.')
         os.remove(video_file)
+    elif 'youtube.com/playlist' in url:  # Check if it's a playlist link
+        update.message.reply_text('Downloading playlist...')
+        download_youtube_playlist(url, './')
+        update.message.reply_text('Playlist downloaded successfully.')
     else:
-        update.message.reply_text('Please send a valid YouTube link.')
+        update.message.reply_text('Please send a valid YouTube link or playlist link.')
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
