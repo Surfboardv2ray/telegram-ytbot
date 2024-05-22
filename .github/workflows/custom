@@ -10,6 +10,7 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 10 # Modify based on your need
 
     steps:
     - name: Checkout repository
