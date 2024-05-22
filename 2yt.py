@@ -31,6 +31,7 @@ def upload_to_fileio(file_path):
 def handle_message(update, context):
     url = update.message.text
     chat_id = update.message.chat_id
+    context.user_data['url'] = url  # Save the URL in user's context
 
     if 'youtube.com/watch' in url:  # Check if it's a regular video link
         keyboard = [[InlineKeyboardButton("144p", callback_data='144'),
