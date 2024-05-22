@@ -11,6 +11,13 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 def start(update, context):
     update.message.reply_text('Send me a YouTube link or playlist link, and I will download the video(s) and send you a link.')
 
+def normalize_youtube_url(url):
+    # Check if the URL is a shortened YouTube URL
+    if 'youtu.be' in url:
+        video_id = url.split('/')[-1]
+        return f'https://www.youtube.com/watch?v={video_id}'
+    return url
+
 def download_youtube_video(url, output_path, quality=None):
     yt = YouTube(url)
     if quality:
@@ -79,18 +86,16 @@ def download_youtube_playlist(playlist_url, message, quality=None):
 def handle_message(update, context):
     url = update.message.text
     chat_id = update.message.chat_id
-    context.user_data['url'] = url  # Save the URL in user's context
+    normalized_url = normalize_youtube_url(url)
+    context.user_data['url'] = normalized_url  # Save the normalized URL in user's context
 
-    if 'youtube.com/watch' in url:  # Check if it's a regular video link
-        keyboard = [[InlineKeyboardButton("144p", callback_data='144'),
-                     InlineKeyboardButton("240p", callback_data='240'),
-                     InlineKeyboardButton("360p", callback_data='360'),
-                     InlineKeyboardButton("480p", callback_data='480'),
-                     InlineKeyboardButton("720p", callback_data='720'),
-                     InlineKeyboardButton("1080p", callback_data='1080')]]
+    if 'youtube.com/watch' in normalized_url:  # Check if it's a regular video link
+        yt = YouTube(normalized_url)
+        available_qualities = [stream.resolution for stream in yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc()]
+        keyboard = [[InlineKeyboardButton(q, callback_data=q) for q in available_qualities]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text('Please select the video quality:', reply_markup=reply_markup)
-    elif 'youtube.com/playlist' in url:  # Check if it's a playlist link
+    elif 'youtube.com/playlist' in normalized_url:  # Check if it's a playlist link
         keyboard = [[InlineKeyboardButton("Lowest Quality", callback_data='lowest'),
                      InlineKeyboardButton("Highest Quality", callback_data='highest')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -102,8 +107,8 @@ def button(update, context):
     query = update.callback_query
     quality = query.data
 
-    if quality.isdigit():
-        quality += 'p'  # Append 'p' to make it resolution (e.g., 720p)
+    if quality.isdigit() or quality.endswith('p'):
+        quality = quality + 'p' if quality.isdigit() else quality
         try:
             query.answer()
             query.edit_message_text(text=f"Selected video quality: {quality}")
@@ -130,7 +135,7 @@ def button(update, context):
 def main():
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("No TELEGRAM_BOT_TOKEN found. Set the TELEGRAM_BOT_TOKEN environment variable.")
-    
+
     updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler('start', start))
