@@ -30,6 +30,30 @@ def upload_to_fileio(file_path):
         else:
             return None
 
+def get_playlist_video_qualities(playlist_url):
+    playlist = Playlist(playlist_url)
+    qualities = []
+    for video_url in playlist.video_urls:
+        yt = YouTube(video_url)
+        video_qualities = [stream.resolution for stream in yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc()]
+        qualities.extend(video_qualities)
+    return qualities
+
+def download_youtube_playlist(playlist_url, message):
+    try:
+        playlist_qualities = get_playlist_video_qualities(playlist_url)
+        if not playlist_qualities:
+            message.reply_text("No videos found in the playlist.")
+            return
+        
+        lowest_quality = min(playlist_qualities)
+        highest_quality = max(playlist_qualities)
+        
+        message.reply_text(f"Lowest quality available in the playlist: {lowest_quality}")
+        message.reply_text(f"Highest quality available in the playlist: {highest_quality}")
+    except Exception as e:
+        message.reply_text(f'Error: {e}')
+
 def handle_message(update, context):
     url = update.message.text
     chat_id = update.message.chat_id
@@ -51,27 +75,6 @@ def handle_message(update, context):
         update.message.reply_text('Please select the quality for all videos in the playlist:', reply_markup=reply_markup)
     else:
         update.message.reply_text('Please send a valid YouTube link or playlist link.')
-
-def download_youtube_playlist(playlist_url, message, quality=None):
-    try:
-        playlist = Playlist(playlist_url)
-        total_videos = len(playlist.video_urls)
-        current_video = 0
-
-        for video_url in playlist.video_urls:
-            current_video += 1
-            message.reply_text(f'Uploading video {current_video}/{total_videos}...')
-
-            video_file = download_youtube_video(video_url, './', quality=quality)
-            fileio_link = upload_to_fileio(video_file)
-            if fileio_link:
-                message.reply_text(f'Uploaded video {current_video}/{total_videos}: {fileio_link}')
-            else:
-                message.reply_text(f'Failed to upload video {current_video}/{total_videos}.')
-            os.remove(video_file)
-
-    except Exception as e:
-        message.reply_text(f'Error: {e}')
 
 def button(update, context):
     query = update.callback_query
@@ -97,12 +100,12 @@ def button(update, context):
         query.answer()
         query.edit_message_text(text=f"Selected quality: Lowest Quality")
         url = context.user_data['url']
-        download_youtube_playlist(url, query.message, quality='144')
+        download_youtube_playlist(url, query.message)
     elif quality == 'highest':
         query.answer()
         query.edit_message_text(text=f"Selected quality: Highest Quality")
         url = context.user_data['url']
-        download_youtube_playlist(url, query.message, quality='1080')
+        download_youtube_playlist(url, query.message)
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
